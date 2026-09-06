@@ -4,12 +4,10 @@ using UnityEngine.UI;
 
 public class NetworkUI : MonoBehaviour
 {
-    public Button clientButton;
-    public Button hostButton;
-    
+    public Button quickJoinButton;
+    public ConnectionManager connectionManager;
     void Start()
     {
-        clientButton.onClick.AddListener(() => NetworkManager.Singleton.StartClient());
-        hostButton.onClick.AddListener(() => NetworkManager.Singleton.StartHost());
+        quickJoinButton.onClick.AddListener(connectionManager.QuickJoinOrCreateSession);
     }
 }
