@@ -169,6 +169,7 @@ GameObject:
   - component: {fileID: 8270947435724041555}
   - component: {fileID: 6437102477178121303}
   - component: {fileID: 8443018452847033725}
+  - component: {fileID: 4514852091210058498}
   m_Layer: 0
   m_Name: VR Network Player
   m_TagString: Untagged
@@ -207,7 +208,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2514946965
+  GlobalObjectIdHash: 1109464088
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -259,6 +260,29 @@ MonoBehaviour:
   - {fileID: 133398502922788532}
   - {fileID: 5379389129346219423}
   - {fileID: 4012270159010604496}
+--- !u!114 &4514852091210058498
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4709760661000578975}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d09014d410cb794ba2aac7e0f0ab380, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkSetRandomColor
+  ShowTopMostFoldoutHeaderGroup: 1
+  renderers:
+  - {fileID: 7012819274711734892}
+  - {fileID: 7920085367198121306}
+  - {fileID: 7712452244334841479}
+  - {fileID: 4012270159010604496}
+  randomColor:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &5608757364935503041
 GameObject:
   m_ObjectHideFlags: 0

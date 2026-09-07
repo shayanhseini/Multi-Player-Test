@@ -59,7 +59,12 @@ public class ConnectionManager : MonoBehaviour
     {
         if (_currentSession != null)
         {
+            onConnectionEvent?.Invoke(ConnectionState.Disconnecting);
+            
             await _currentSession.LeaveAsync();
+            _currentSession = null;
+            
+            onConnectionEvent?.Invoke(ConnectionState.Disconnected);
         }
     }
     
