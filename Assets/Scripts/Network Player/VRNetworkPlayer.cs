@@ -10,11 +10,30 @@ public class VRNetworkPlayer : NetworkBehaviour
     public Transform rightHand;
 
     public List<Renderer> localRendererToHide;
+    
+    public NetworkVariable<PlayerRole> role =
+        new NetworkVariable<PlayerRole>(
+            PlayerRole.Guest,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Owner
+        );
+    
+    public event Action<PlayerRole> OnRoleReady;
+
+    public void SetRole(PlayerRole newRole)
+    {
+        role.Value = newRole;
+        OnRoleReady?.Invoke(newRole);
+    }
 
     public override void OnNetworkSpawn()
     {
         if (IsOwner)
         {
+            role.Value = UIManager.SelectedRole;
+
+            Debug.Log($"My Role: {role.Value}");
+
             foreach (Renderer rend in localRendererToHide)
             {
                 rend.enabled = false;

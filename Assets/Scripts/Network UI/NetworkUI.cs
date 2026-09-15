@@ -10,7 +10,7 @@ public class NetworkUI : MonoBehaviour
     public GameObject offlinePanel, connectingPanel, connectedPanel;
     void Start()
     {
-        quickJoinButton.onClick.AddListener(connectionManager.QuickJoinOrCreateSession);
+        //quickJoinButton.onClick.AddListener(connectionManager.QuickJoinOrCreateSession);
         disconnectButton.onClick.AddListener(connectionManager.Disconnect);
         
         UpdateUI(ConnectionManager.ConnectionState.Disconnected);

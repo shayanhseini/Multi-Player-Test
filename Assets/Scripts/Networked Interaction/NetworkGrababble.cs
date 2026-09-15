@@ -6,19 +6,24 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 public class NetworkGrababble : NetworkBehaviour
 {
     private XRGrabInteractable grabInteractable;
-    void Start()
+
+    private void Start()
     {
         grabInteractable = GetComponent<XRGrabInteractable>();
+
         grabInteractable.selectEntered.AddListener(SetOwnershipOnGrab);
     }
-    
+
     private void SetOwnershipOnGrab(SelectEnterEventArgs args)
     {
-        if (NetworkManager.Singleton.IsConnectedClient && !IsOwner)
-        {
-            NetworkObject.ChangeOwnership(NetworkManager.Singleton.LocalClientId);
-            // The Same
-            // NetworkObject.RequestOwnership();
-        }
+        if (!NetworkManager.Singleton.IsConnectedClient)
+            return;
+
+        if (IsOwner)
+            return;
+
+        NetworkObject.ChangeOwnership(
+            NetworkManager.Singleton.LocalClientId
+        );
     }
 }
