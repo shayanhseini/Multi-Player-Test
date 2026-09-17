@@ -1,14 +1,35 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class PresentationUI : MonoBehaviour
 {
-    [SerializeField] private GameObject panel1;
-    [SerializeField] private GameObject panel2;
+    [Header("Presentation Panels")]
+    [SerializeField] private List<GameObject> panels;
 
+    [Header("Network State")]
     [SerializeField] private PresentationState presentationState;
 
     private void Start()
     {
+        if (presentationState == null)
+        {
+            Debug.LogError(
+                "Presentation State تنظیم نشده است."
+            );
+
+            return;
+        }
+
+        if (panels == null || panels.Count == 0)
+        {
+            Debug.LogWarning(
+                "هیچ Panel ای در Presentation UI قرار داده نشده است."
+            );
+
+            return;
+        }
+
+        // نمایش صفحه فعلی
         presentationState.currentPage.OnValueChanged += OnPageChanged;
 
         UpdatePage(presentationState.currentPage.Value);
@@ -21,8 +42,23 @@ public class PresentationUI : MonoBehaviour
 
     private void UpdatePage(int page)
     {
-        panel1.SetActive(page == 0);
-        panel2.SetActive(page == 1);
+        if (panels == null || panels.Count == 0)
+            return;
+
+        if (page < 0 || page >= panels.Count)
+        {
+            Debug.LogWarning(
+                $"Page {page} برای Panels معتبر نیست. " +
+                $"تعداد Panels: {panels.Count}"
+            );
+
+            return;
+        }
+
+        for (int i = 0; i < panels.Count; i++)
+        {
+            panels[i].SetActive(i == page);
+        }
     }
 
     private void OnDestroy()

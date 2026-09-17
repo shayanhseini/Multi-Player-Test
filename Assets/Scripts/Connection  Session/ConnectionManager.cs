@@ -41,6 +41,12 @@ public class ConnectionManager : MonoBehaviour
     public UnityEvent onSessionJoined;
 
 
+    public string GetSessionID()
+    {
+        return _currentSession.Id;
+    }
+
+
     // =========================
     // CREATE SESSION
     // =========================
