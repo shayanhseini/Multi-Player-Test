@@ -9,7 +9,8 @@ public class UIManager : MonoBehaviour
     // =========================
 
     public static PlayerRole SelectedRole { get; private set; }
-    
+
+
     // =========================
     // PANELS
     // =========================
@@ -81,20 +82,22 @@ public class UIManager : MonoBehaviour
     // =========================
 
     public ConnectionManager connectionManager;
-    
+
+
     // =========================
     // SESSION CODE
     // =========================
+
     [Header("Text")]
-    public TextMeshProUGUI sessionCreatedCodeText; 
-    public TextMeshProUGUI sessionJoinCodeText; 
+    public TextMeshProUGUI sessionCreatedCodeText;
+    public TextMeshProUGUI sessionJoinCodeText;
 
 
     // =========================
     // START
     // =========================
 
-    void Start()
+    private void Start()
     {
         // =========================
         // Main Menu
@@ -102,10 +105,10 @@ public class UIManager : MonoBehaviour
 
         presenterButton.onClick.AddListener(ShowPresenterPassword);
         guestButton.onClick.AddListener(ShowJoinSession);
+
         // Set Role
         presenterButton.onClick.AddListener(SetPresenterRole);
         guestButton.onClick.AddListener(SetGuestRole);
-
 
 
         // =========================
@@ -113,7 +116,8 @@ public class UIManager : MonoBehaviour
         // =========================
 
         passwordConfirmButton.onClick.AddListener(CheckPresenterPassword);
-        passwordBackButton.onClick.AddListener(ShowMainMenu);
+
+        passwordBackButton.onClick.AddListener(OnPasswordBack);
 
 
         // =========================
@@ -122,7 +126,8 @@ public class UIManager : MonoBehaviour
 
         createSessionButton.onClick.AddListener(ShowCreateSession);
         joinSessionButton.onClick.AddListener(ShowJoinSession);
-        presenterMenuBackButton.onClick.AddListener(ShowMainMenu);
+
+        presenterMenuBackButton.onClick.AddListener(OnPresenterMenuBack);
 
 
         // =========================
@@ -130,7 +135,8 @@ public class UIManager : MonoBehaviour
         // =========================
 
         createButton.onClick.AddListener(OnCreateSession);
-        createSessionBackButton.onClick.AddListener(ShowPresenterMenu);
+
+        createSessionBackButton.onClick.AddListener(OnCreateSessionBack);
 
 
         // =========================
@@ -138,7 +144,8 @@ public class UIManager : MonoBehaviour
         // =========================
 
         joinButton.onClick.AddListener(OnJoinSession);
-        joinSessionBackButton.onClick.AddListener(ShowMainMenu);
+
+        joinSessionBackButton.onClick.AddListener(OnJoinSessionBack);
 
 
         // =========================
@@ -146,15 +153,18 @@ public class UIManager : MonoBehaviour
         // =========================
 
         disconnectButton.onClick.AddListener(OnDisconnect);
-        
-        
+
+
         // =========================
         // Connection Events
         // =========================
 
         connectionManager.onConnectionEvent.AddListener(OnConnectionStateChanged);
+
         connectionManager.onSessionCreated.AddListener(ShowSessionCreated);
+
         connectionManager.onSessionJoined.AddListener(ShowJoinedSession);
+
         connectionManager.onSessionCodeCreated.AddListener(SetSessionCode);
 
 
@@ -166,11 +176,26 @@ public class UIManager : MonoBehaviour
     }
 
 
-    // =========================
-    // PRESENTER PASSWORD
-    // =========================
+    // =========================================================
+    // KEYBOARD
+    // =========================================================
 
-    void CheckPresenterPassword()
+    private void HideKeyboard()
+    {
+        if (KeyboardManager.Instance == null)
+            return;
+
+        KeyboardManager.Instance.HideKeyboard();
+
+        KeyboardManager.Instance.ClearActiveInputField();
+    }
+
+
+    // =========================================================
+    // PRESENTER PASSWORD
+    // =========================================================
+
+    private void CheckPresenterPassword()
     {
         string password = passwordInput.text;
 
@@ -179,6 +204,8 @@ public class UIManager : MonoBehaviour
             Debug.Log("Presenter password correct.");
 
             passwordInput.text = "";
+
+            HideKeyboard();
 
             ShowPresenterMenu();
         }
@@ -191,27 +218,42 @@ public class UIManager : MonoBehaviour
     }
 
 
-    // =========================
-    // CREATE SESSION
-    // =========================
+    // =========================================================
+    // PASSWORD BACK
+    // =========================================================
 
-    void OnCreateSession()
+    private void OnPasswordBack()
     {
+        HideKeyboard();
+
+        ShowMainMenu();
+    }
+
+
+    // =========================================================
+    // CREATE SESSION
+    // =========================================================
+
+    private void OnCreateSession()
+    {
+        HideKeyboard();
+
         connectionManager.CreateSession();
     }
-    
-    void SetSessionCode(string sessionCode)
+
+
+    private void SetSessionCode(string sessionCode)
     {
         sessionCreatedCodeText.text = sessionCode;
         sessionJoinCodeText.text = sessionCode;
     }
 
 
-    // =========================
+    // =========================================================
     // JOIN SESSION
-    // =========================
+    // =========================================================
 
-    void OnJoinSession()
+    private void OnJoinSession()
     {
         string sessionCode = sessionCodeInput.text;
 
@@ -221,29 +263,72 @@ public class UIManager : MonoBehaviour
             return;
         }
 
+        HideKeyboard();
+
         connectionManager.JoinSession(sessionCode);
     }
 
 
-    // =========================
-    // DISCONNECT
-    // =========================
+    // =========================================================
+    // JOIN SESSION BACK
+    // =========================================================
 
-    void OnDisconnect()
+    private void OnJoinSessionBack()
     {
+        HideKeyboard();
+
+        ShowMainMenu();
+    }
+
+
+    // =========================================================
+    // PRESENTER MENU BACK
+    // =========================================================
+
+    private void OnPresenterMenuBack()
+    {
+        HideKeyboard();
+
+        ShowMainMenu();
+    }
+
+
+    // =========================================================
+    // CREATE SESSION BACK
+    // =========================================================
+
+    private void OnCreateSessionBack()
+    {
+        HideKeyboard();
+
+        ShowPresenterMenu();
+    }
+
+
+    // =========================================================
+    // DISCONNECT
+    // =========================================================
+
+    private void OnDisconnect()
+    {
+        HideKeyboard();
+
         connectionManager.Disconnect();
     }
 
 
-    // =========================
+    // =========================================================
     // CONNECTION STATE
-    // =========================
+    // =========================================================
 
-    void OnConnectionStateChanged(ConnectionManager.ConnectionState state)
+    private void OnConnectionStateChanged(
+        ConnectionManager.ConnectionState state)
     {
         switch (state)
         {
             case ConnectionManager.ConnectionState.Connecting:
+
+                HideKeyboard();
 
                 ShowConnecting();
 
@@ -252,9 +337,6 @@ public class UIManager : MonoBehaviour
 
             case ConnectionManager.ConnectionState.Success:
 
-                // Session Created / Joined
-                // از Eventهای جداگانه مدیریت می‌شوند.
-
                 break;
 
 
@@ -262,10 +344,16 @@ public class UIManager : MonoBehaviour
 
                 Debug.Log("Connection Failed.");
 
+                HideKeyboard();
+
+                ShowMainMenu();
+
                 break;
 
 
             case ConnectionManager.ConnectionState.Disconnecting:
+
+                HideKeyboard();
 
                 ShowConnecting();
 
@@ -274,39 +362,51 @@ public class UIManager : MonoBehaviour
 
             case ConnectionManager.ConnectionState.Disconnected:
 
+                HideKeyboard();
+
                 ShowMainMenu();
 
                 break;
         }
     }
-    
-    // =========================
+
+
+    // =========================================================
     // ROLE SELECTION
-    // =========================
-    
-    void SetPresenterRole()
+    // =========================================================
+
+    private void SetPresenterRole()
     {
         SelectedRole = PlayerRole.Presenter;
     }
 
-    void SetGuestRole()
+
+    private void SetGuestRole()
     {
         SelectedRole = PlayerRole.Guest;
     }
-    
-    // =========================
+
+
+    // =========================================================
     // PANEL CONTROL
-    // =========================
+    // =========================================================
 
     public void HideAllPanels()
     {
         mainMenu.SetActive(false);
+
         presenterPassword.SetActive(false);
+
         presenterMenu.SetActive(false);
+
         createSession.SetActive(false);
+
         joinSession.SetActive(false);
+
         sessionCreated.SetActive(false);
+
         joinedSession.SetActive(false);
+
         connecting.SetActive(false);
     }
 
@@ -314,6 +414,7 @@ public class UIManager : MonoBehaviour
     public void ShowMainMenu()
     {
         HideAllPanels();
+
         mainMenu.SetActive(true);
     }
 
@@ -321,6 +422,7 @@ public class UIManager : MonoBehaviour
     public void ShowPresenterPassword()
     {
         HideAllPanels();
+
         presenterPassword.SetActive(true);
     }
 
@@ -328,6 +430,7 @@ public class UIManager : MonoBehaviour
     public void ShowPresenterMenu()
     {
         HideAllPanels();
+
         presenterMenu.SetActive(true);
     }
 
@@ -335,6 +438,7 @@ public class UIManager : MonoBehaviour
     public void ShowCreateSession()
     {
         HideAllPanels();
+
         createSession.SetActive(true);
     }
 
@@ -342,6 +446,7 @@ public class UIManager : MonoBehaviour
     public void ShowJoinSession()
     {
         HideAllPanels();
+
         joinSession.SetActive(true);
     }
 
@@ -349,6 +454,7 @@ public class UIManager : MonoBehaviour
     public void ShowSessionCreated()
     {
         HideAllPanels();
+
         sessionCreated.SetActive(true);
     }
 
@@ -356,6 +462,7 @@ public class UIManager : MonoBehaviour
     public void ShowJoinedSession()
     {
         HideAllPanels();
+
         joinedSession.SetActive(true);
     }
 
@@ -363,6 +470,7 @@ public class UIManager : MonoBehaviour
     public void ShowConnecting()
     {
         HideAllPanels();
+
         connecting.SetActive(true);
     }
 }

@@ -95,7 +95,7 @@ public class ConnectionManager : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogException(e);
+            Debug.LogWarning(e);
 
             onConnectionEvent?.Invoke(ConnectionState.Failed);
         }
@@ -142,7 +142,7 @@ public class ConnectionManager : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogException(e);
+            Debug.LogWarning(e);
 
             onConnectionEvent?.Invoke(ConnectionState.Failed);
         }
@@ -165,7 +165,7 @@ public class ConnectionManager : MonoBehaviour
             }
             catch (Exception e)
             {
-                Debug.LogException(e);
+                Debug.LogWarning(e);
             }
 
             _currentSession = null;
@@ -202,7 +202,7 @@ public class ConnectionManager : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogException(e);
+            Debug.LogWarning(e);
 
             return false;
         }

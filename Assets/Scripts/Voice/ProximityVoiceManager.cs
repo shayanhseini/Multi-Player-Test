@@ -66,7 +66,7 @@ public class ProximityVoiceManager : MonoBehaviour
             }
             catch (Exception e)
             {
-                Debug.Log(e.Message);
+                Debug.LogWarning(e.Message);
                 vivoxSignIn = false;
             }
         }
@@ -91,7 +91,7 @@ public class ProximityVoiceManager : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogException(e);
+            Debug.LogWarning(e);
             hasJoinedChannel = false;
         }
         
