@@ -1,48 +1,86 @@
 using Unity.Netcode;
+using UnityEngine;
 
 public class PresentationState : NetworkBehaviour
 {
     public NetworkVariable<int> currentPage =
-        new NetworkVariable<int>();
+        new NetworkVariable<int>(
+            0,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
 
     public int PageCount { get; private set; }
 
     public void SetPageCount(int count)
     {
-        PageCount = count;
+        PageCount = Mathf.Max(0, count);
+
+        Debug.Log(
+            $"[PresentationState] Page count: {PageCount}"
+        );
     }
 
     public void NextPage()
     {
+        if (!IsSpawned)
+        {
+            Debug.LogWarning(
+                "[PresentationState] NetworkObject is not spawned."
+            );
+            return;
+        }
+
         RequestNextPageRpc();
     }
 
     public void PreviousPage()
     {
+        if (!IsSpawned)
+        {
+            Debug.LogWarning(
+                "[PresentationState] NetworkObject is not spawned."
+            );
+            return;
+        }
+
         RequestPreviousPageRpc();
     }
 
-    [Rpc(SendTo.Server)]
+    [Rpc(
+        SendTo.Authority,
+        InvokePermission = RpcInvokePermission.Everyone
+    )]
     private void RequestNextPageRpc()
     {
-        if (PageCount <= 0)
-            return;
+        Debug.Log(
+            $"[PresentationState] Next: " +
+            $"page={currentPage.Value}, count={PageCount}"
+        );
 
-        if (currentPage.Value < PageCount - 1)
+        if (PageCount <= 0)
         {
-            currentPage.Value++;
+            Debug.LogWarning(
+                "[PresentationState] PageCount is zero."
+            );
+            return;
         }
+
+        currentPage.Value = Mathf.Min(
+            currentPage.Value + 1,
+            PageCount - 1
+        );
     }
 
-    [Rpc(SendTo.Server)]
+    [Rpc(
+        SendTo.Authority,
+        InvokePermission = RpcInvokePermission.Everyone
+    )]
     private void RequestPreviousPageRpc()
     {
-        if (PageCount <= 0)
-            return;
-
-        if (currentPage.Value > 0)
-        {
-            currentPage.Value--;
-        }
+        currentPage.Value = Mathf.Max(
+            currentPage.Value - 1,
+            0
+        );
     }
 }

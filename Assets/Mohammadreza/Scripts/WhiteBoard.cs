@@ -458,7 +458,7 @@ public class WhiteBoard : NetworkBehaviour
             return;
 
 
-        // اطلاعات Draw را برای Server می‌فرستیم.
+        // اطلاعات Draw را برای Authority فعلی تخته می‌فرستیم.
 
         RequestDrawRpc(
             position.x,
@@ -478,12 +478,12 @@ public class WhiteBoard : NetworkBehaviour
 
 
     // =====================================================
-    // CLIENT -> SERVER
+    // CLIENT -> AUTHORITY
     // =====================================================
 
     [Rpc(
-        SendTo.Server,
-        RequireOwnership = false
+        SendTo.Authority,
+        InvokePermission = RpcInvokePermission.Everyone
     )]
     private void RequestDrawRpc(
         float x,
@@ -505,7 +505,7 @@ public class WhiteBoard : NetworkBehaviour
         // Sender واقعاً Presenter هست یا نه.
 
 
-        // Server فرمان Draw را
+        // Authority فرمان Draw را
         // برای Clientها ارسال می‌کند.
 
         BroadcastDrawRpc(
@@ -528,10 +528,13 @@ public class WhiteBoard : NetworkBehaviour
 
 
     // =====================================================
-    // SERVER -> CLIENTS
+    // AUTHORITY -> EVERYONE
     // =====================================================
 
-    [Rpc(SendTo.NotServer)]
+    [Rpc(
+        SendTo.Everyone,
+        InvokePermission = RpcInvokePermission.Owner
+    )]
     private void BroadcastDrawRpc(
         float x,
         float y,

@@ -4,27 +4,38 @@ public class PresentationDisplay : MonoBehaviour
 {
     [Header("Display")]
     [SerializeField] private Renderer displayRenderer;
-
-    [Tooltip("شماره متریالی که صفحه نمایش روی آن قرار دارد")]
     [SerializeField] private int materialIndex = 1;
-
-    [Tooltip("نام Property مربوط به Texture در Shader")]
     [SerializeField] private string textureProperty = "_MainTex";
 
-    [Header("Presentation Images")]
+    [Header("Presentation")]
     [SerializeField] private Texture[] images;
-
-    [Header("Settings")]
-    [SerializeField] private bool loop = false;
+    [SerializeField] private PresentationState presentationState;
 
     private Material displayMaterial;
-    private int currentIndex = 0;
 
-    private void Awake()
+    private void Start()
     {
         if (displayRenderer == null)
         {
-            Debug.LogError("Display Renderer تنظیم نشده است.");
+            Debug.LogError(
+                "[PresentationDisplay] Display Renderer is missing."
+            );
+            return;
+        }
+
+        if (presentationState == null)
+        {
+            Debug.LogError(
+                "[PresentationDisplay] PresentationState is missing."
+            );
+            return;
+        }
+
+        if (images == null || images.Length == 0)
+        {
+            Debug.LogError(
+                "[PresentationDisplay] No presentation images assigned."
+            );
             return;
         }
 
@@ -33,71 +44,34 @@ public class PresentationDisplay : MonoBehaviour
         if (materialIndex < 0 || materialIndex >= materials.Length)
         {
             Debug.LogError(
-                $"Material Index اشتباه است. این Renderer فقط {materials.Length} متریال دارد."
+                "[PresentationDisplay] Invalid material index."
             );
             return;
         }
 
         displayMaterial = materials[materialIndex];
 
-        Debug.Log(
-            $"Presentation Display initialized. " +
-            $"Material: {displayMaterial.name} | " +
-            $"Property: {textureProperty}"
-        );
-
         if (!displayMaterial.HasProperty(textureProperty))
         {
             Debug.LogError(
-                $"Texture Property '{textureProperty}' در متریال " +
-                $"'{displayMaterial.name}' پیدا نشد."
+                $"[PresentationDisplay] Property {textureProperty} not found."
             );
-
             return;
         }
 
-        if (images != null && images.Length > 0)
-        {
-            ShowImage(0);
-        }
-        else
-        {
-            Debug.LogWarning("هیچ عکسی در Images قرار داده نشده است.");
-        }
+        // تعداد صفحات را به PresentationState اعلام می‌کند
+        presentationState.SetPageCount(images.Length);
+
+        // دریافت تغییر صفحه شبکه‌ای
+        presentationState.currentPage.OnValueChanged += OnPageChanged;
+
+        // نمایش مقدار فعلی
+        ShowImage(presentationState.currentPage.Value);
     }
 
-    public void NextImage()
+    private void OnPageChanged(int previousPage, int newPage)
     {
-        if (images == null || images.Length == 0)
-            return;
-
-        if (currentIndex < images.Length - 1)
-        {
-            currentIndex++;
-            ShowImage(currentIndex);
-        }
-        else if (loop)
-        {
-            currentIndex = 0;
-            ShowImage(currentIndex);
-        }
-    }
-
-    public void PreviousImage()
-    {
-        if (images == null || images.Length == 0)
-            return;
-
-        if (currentIndex > 0)
-        {
-            currentIndex--;
-            ShowImage(currentIndex);
-        }
-        else if (loop)
-        {
-            currentIndex = images.Length - 1;
-            ShowImage(currentIndex);
-        }
+        ShowImage(newPage);
     }
 
     private void ShowImage(int index)
@@ -106,23 +80,39 @@ public class PresentationDisplay : MonoBehaviour
             return;
 
         if (index < 0 || index >= images.Length)
-            return;
-
-        Texture texture = images[index];
-
-        if (texture == null)
         {
-            Debug.LogWarning($"Image {index + 1} خالی است.");
+            Debug.LogWarning(
+                $"[PresentationDisplay] Page index {index} is invalid."
+            );
             return;
         }
 
-        displayMaterial.SetTexture(textureProperty, texture);
+        displayMaterial.SetTexture(
+            textureProperty,
+            images[index]
+        );
 
-        Debug.Log($"Showing Image {index + 1}: {texture.name}");
+        Debug.Log(
+            $"[PresentationDisplay] Showing page {index + 1}"
+        );
     }
 
-    public int GetCurrentImageIndex()
+    public void NextImage()
     {
-        return currentIndex;
+        presentationState.NextPage();
+    }
+
+    public void PreviousImage()
+    {
+        presentationState.PreviousPage();
+    }
+
+    private void OnDestroy()
+    {
+        if (presentationState != null)
+        {
+            presentationState.currentPage.OnValueChanged -=
+                OnPageChanged;
+        }
     }
 }

@@ -2657,7 +2657,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 729712041
+  GlobalObjectIdHash: 1753892613
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -10686,10 +10686,34 @@ MonoBehaviour:
       m_Calls: []
   onSessionCreated:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 4239894095427921541}
+        m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
+        m_MethodName: SetActive
+        m_Mode: 6
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 1
+        m_CallState: 2
   onSessionJoined:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 4239894095427921541}
+        m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
+        m_MethodName: SetActive
+        m_Mode: 6
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 1
+        m_CallState: 2
 --- !u!1 &1144383163
 GameObject:
   m_ObjectHideFlags: 0
@@ -13455,11 +13479,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 14427319
+  GlobalObjectIdHash: 1303424776
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
-  Ownership: 7
+  Ownership: 8
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
   m_InScenePlaced: 1
@@ -18876,7 +18900,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3869044521
+  GlobalObjectIdHash: 3408894601
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 1
   DeferredDespawnTick: 0
@@ -22485,7 +22509,7 @@ Transform:
   - {fileID: 7189520925776031668}
   - {fileID: 4405379858297229853}
   - {fileID: 4583999564609585079}
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 6463870460602392367}
   m_LocalEulerAnglesHint: {x: 0, y: -61.094, z: 0}
 --- !u!222 &2725429577793614582
 CanvasRenderer:
@@ -23258,7 +23282,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &4246410307565659642
 RectTransform:
   m_ObjectHideFlags: 0
@@ -24672,7 +24696,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3729280469
+  GlobalObjectIdHash: 2052745802
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -24728,7 +24752,7 @@ Transform:
   - {fileID: 5586180308797693531}
   - {fileID: 8284059671375666462}
   - {fileID: 6721447700035987795}
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 6463870460602392367}
   m_LocalEulerAnglesHint: {x: 270, y: 0, z: -61.9}
 --- !u!1001 &5882070251693833837
 PrefabInstance:
@@ -24995,7 +25019,7 @@ Transform:
   m_Children:
   - {fileID: 9018507594651119677}
   - {fileID: 5439307535098587897}
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 6463870460602392367}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &6185275369604314666
 MonoBehaviour:
@@ -25161,6 +25185,9 @@ Transform:
   - {fileID: 3647879052632837100}
   - {fileID: 5415082849425921936}
   - {fileID: 2129221244873818880}
+  - {fileID: 6128260109538865697}
+  - {fileID: 2724807863249277602}
+  - {fileID: 5879922441055907159}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &6469338883788585149
@@ -26144,7 +26171,7 @@ MonoBehaviour:
   - {fileID: 2800000, guid: 298ff626d2ff45d479ed715bf78a405c, type: 3}
   - {fileID: 2800000, guid: 56d9a1810ad778b4c8410a60c10381d4, type: 3}
   - {fileID: 2800000, guid: 2a7a13425b46b0f4aa871b390d2ef43f, type: 3}
-  presentationState: {fileID: 1425504872}
+  loop: 0
 --- !u!223 &7782949840521468324
 Canvas:
   m_ObjectHideFlags: 0
@@ -26660,9 +26687,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1985164001
+  GlobalObjectIdHash: 1039528376
   InScenePlacedSourceGlobalObjectIdHash: 0
-  m_InScenePlacedDisabledByDefault: 0
+  m_InScenePlacedDisabledByDefault: 1
   DeferredDespawnTick: 0
   Ownership: 3
   AlwaysReplicateAsRoot: 0
@@ -26968,9 +26995,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2493575614
+  GlobalObjectIdHash: 1444804074
   InScenePlacedSourceGlobalObjectIdHash: 0
-  m_InScenePlacedDisabledByDefault: 0
+  m_InScenePlacedDisabledByDefault: 1
   DeferredDespawnTick: 0
   Ownership: 3
   AlwaysReplicateAsRoot: 0
@@ -27108,9 +27135,6 @@ GameObject:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 6128260109538865697}
-  - {fileID: 2724807863249277602}
-  - {fileID: 5879922441055907159}
   - {fileID: 322309927}
   - {fileID: 868258590}
   - {fileID: 6463870460602392367}
