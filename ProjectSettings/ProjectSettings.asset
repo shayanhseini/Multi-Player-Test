@@ -937,10 +937,10 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 1
   windowsGamepadBackendHint: 0
-  cloudProjectId: 3cd8bbbc-1df3-4655-9540-d72ed160a08c
+  cloudProjectId: 35ac764e-70d0-45aa-9a91-85c0a2a61750
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: Multi Player Test (1)
+  projectName: Multi Player Test
   organizationId: shayanhseini
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
