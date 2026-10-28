@@ -11,19 +11,42 @@ public class NetworkGrababble : NetworkBehaviour
     {
         grabInteractable = GetComponent<XRGrabInteractable>();
 
-        grabInteractable.selectEntered.AddListener(SetOwnershipOnGrab);
+        if (grabInteractable != null)
+            grabInteractable.selectEntered.AddListener(SetOwnershipOnGrab);
     }
 
     private void SetOwnershipOnGrab(SelectEnterEventArgs args)
     {
-        if (!NetworkManager.Singleton.IsConnectedClient)
+        if (NetworkManager.Singleton == null ||
+            !NetworkManager.Singleton.IsConnectedClient ||
+            !IsSpawned)
             return;
 
         if (IsOwner)
             return;
 
+        RequestOwnershipRpc();
+    }
+
+    [Rpc(
+        SendTo.Server,
+        InvokePermission = RpcInvokePermission.Everyone
+    )]
+    private void RequestOwnershipRpc(RpcParams rpcParams = default)
+    {
+        if (!IsSpawned || !IsServer)
+            return;
+
         NetworkObject.ChangeOwnership(
-            NetworkManager.Singleton.LocalClientId
+            rpcParams.Receive.SenderClientId
         );
+    }
+
+    public override void OnDestroy()
+    {
+        if (grabInteractable != null)
+            grabInteractable.selectEntered.RemoveListener(SetOwnershipOnGrab);
+
+        base.OnDestroy();
     }
 }

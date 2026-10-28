@@ -12,9 +12,20 @@ public class PresentationState : NetworkBehaviour
 
     public int PageCount { get; private set; }
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        if (IsOwner)
+            NetworkObject.DontDestroyWithOwner = true;
+    }
+
     public void SetPageCount(int count)
     {
         PageCount = Mathf.Max(0, count);
+
+        if (IsOwner && PageCount > 0 && currentPage.Value >= PageCount)
+            currentPage.Value = PageCount - 1;
 
         Debug.Log(
             $"[PresentationState] Page count: {PageCount}"
@@ -51,8 +62,18 @@ public class PresentationState : NetworkBehaviour
         SendTo.Authority,
         InvokePermission = RpcInvokePermission.Everyone
     )]
-    private void RequestNextPageRpc()
+    private void RequestNextPageRpc(RpcParams rpcParams = default)
     {
+        if (!NetworkRoleUtility.HasRole(
+                rpcParams.Receive.SenderClientId,
+                PlayerRole.Presenter))
+        {
+            Debug.LogWarning(
+                "[PresentationState] Rejected NextPage from a non-presenter."
+            );
+            return;
+        }
+
         Debug.Log(
             $"[PresentationState] Next: " +
             $"page={currentPage.Value}, count={PageCount}"
@@ -76,8 +97,18 @@ public class PresentationState : NetworkBehaviour
         SendTo.Authority,
         InvokePermission = RpcInvokePermission.Everyone
     )]
-    private void RequestPreviousPageRpc()
+    private void RequestPreviousPageRpc(RpcParams rpcParams = default)
     {
+        if (!NetworkRoleUtility.HasRole(
+                rpcParams.Receive.SenderClientId,
+                PlayerRole.Presenter))
+        {
+            Debug.LogWarning(
+                "[PresentationState] Rejected PreviousPage from a non-presenter."
+            );
+            return;
+        }
+
         currentPage.Value = Mathf.Max(
             currentPage.Value - 1,
             0

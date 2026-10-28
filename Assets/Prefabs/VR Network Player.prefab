@@ -1714,7 +1714,7 @@ GameObject:
   - component: {fileID: 6437102477178121303}
   - component: {fileID: 8443018452847033725}
   - component: {fileID: 4514852091210058498}
-  - component: {fileID: 2750425984771937695}
+  - component: {fileID: 7240916321140000001}
   m_Layer: 0
   m_Name: VR Network Player
   m_TagString: Untagged
@@ -1815,7 +1815,7 @@ MonoBehaviour:
       MinSecondsBetweenUpdates: 0
       MaxSecondsBetweenUpdates: 0
     m_InternalValue: {r: 1, g: 1, b: 1, a: 1}
---- !u!114 &2750425984771937695
+--- !u!114 &7240916321140000001
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1824,11 +1824,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 4709760661000578975}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d8b266648c81f3e439e28c3c7f14f5a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ProximityChatPlayer
+  m_Script: {fileID: 11500000, guid: 5ab7e2479d174de1ad2ef43f899e4221, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkShooter
   ShowTopMostFoldoutHeaderGroup: 1
-  head: {fileID: 5511120264635366450}
+  damage: 25
+  maxDistance: 50
+  fireInterval: 0.2
+  bulletRadius: 0.02
+  visualBulletSpeed: 35
+  hitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &4759396568396394575
 GameObject:
   m_ObjectHideFlags: 0

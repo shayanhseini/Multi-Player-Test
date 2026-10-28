@@ -85,7 +85,7 @@ public class UIManager : MonoBehaviour
 
 
     // =========================
-    // SESSION CODE
+    // LAN ADDRESS
     // =========================
 
     [Header("Text")]
@@ -103,7 +103,7 @@ public class UIManager : MonoBehaviour
         // Main Menu
         // =========================
 
-        presenterButton.onClick.AddListener(ShowPresenterPassword);
+        presenterButton.onClick.AddListener(ShowPresenterMenu);
         guestButton.onClick.AddListener(ShowJoinSession);
 
         // Set Role
@@ -114,10 +114,6 @@ public class UIManager : MonoBehaviour
         // =========================
         // Presenter Password
         // =========================
-
-        passwordConfirmButton.onClick.AddListener(CheckPresenterPassword);
-
-        passwordBackButton.onClick.AddListener(OnPasswordBack);
 
 
         // =========================
@@ -191,44 +187,6 @@ public class UIManager : MonoBehaviour
     }
 
 
-    // =========================================================
-    // PRESENTER PASSWORD
-    // =========================================================
-
-    private void CheckPresenterPassword()
-    {
-        string password = passwordInput.text;
-
-        if (password == "1234")
-        {
-            Debug.Log("Presenter password correct.");
-
-            passwordInput.text = "";
-
-            HideKeyboard();
-
-            ShowPresenterMenu();
-        }
-        else
-        {
-            Debug.Log("Wrong presenter password.");
-
-            passwordInput.text = "";
-        }
-    }
-
-
-    // =========================================================
-    // PASSWORD BACK
-    // =========================================================
-
-    private void OnPasswordBack()
-    {
-        HideKeyboard();
-
-        ShowMainMenu();
-    }
-
 
     // =========================================================
     // CREATE SESSION
@@ -259,7 +217,7 @@ public class UIManager : MonoBehaviour
 
         if (string.IsNullOrWhiteSpace(sessionCode))
         {
-            Debug.Log("Session Code is empty.");
+            Debug.Log("LAN host IP address is empty.");
             return;
         }
 
@@ -327,6 +285,8 @@ public class UIManager : MonoBehaviour
         switch (state)
         {
             case ConnectionManager.ConnectionState.Connecting:
+
+            case ConnectionManager.ConnectionState.Reconnecting:
 
                 HideKeyboard();
 

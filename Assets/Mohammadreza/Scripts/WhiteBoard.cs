@@ -13,6 +13,13 @@ public class WhiteBoard : NetworkBehaviour
     public float maxDistance = 0.2f;
     public float minBrushDistance = 2f;
 
+    [Header("Network Drawing")]
+    [SerializeField, Min(0.01f)]
+    private float batchInterval = 0.04f;
+
+    [SerializeField, Range(2, 64)]
+    private int maxPointsPerBatch = 24;
+
     public Color backGroundColor = Color.white;
 
     [Range(0, 1)]
@@ -22,6 +29,24 @@ public class WhiteBoard : NetworkBehaviour
     public bool useBoxCollider = true;
 
     private Material brushMaterial;
+    private readonly Vector2[] drawVertices = new Vector2[4];
+    private readonly List<Vector2> pendingDrawPoints = new List<Vector2>(32);
+    private readonly List<DrawBatchRecord> drawHistory = new List<DrawBatchRecord>();
+
+    private Color pendingColor;
+    private float pendingSizeX;
+    private float pendingSizeY;
+    private float pendingRotation;
+    private float nextBatchSendTime;
+
+    private sealed class DrawBatchRecord
+    {
+        public Vector2[] Positions;
+        public Color Color;
+        public float SizeX;
+        public float SizeY;
+        public float Rotation;
+    }
 
 
     [System.Serializable]
@@ -217,6 +242,12 @@ public class WhiteBoard : NetworkBehaviour
                 DrawBrushOnTexture(brush);
             }
         }
+
+        if (pendingDrawPoints.Count > 0 &&
+            Time.unscaledTime >= nextBatchSendTime)
+        {
+            FlushPendingDrawBatch();
+        }
     }
 
 
@@ -353,7 +384,7 @@ public class WhiteBoard : NetworkBehaviour
 
             if (brush.isFirstDraw)
             {
-                SendDraw(
+                QueueDraw(
                     currentPosition,
                     brush.color,
                     brush.sizeX,
@@ -405,7 +436,7 @@ public class WhiteBoard : NetworkBehaviour
                     );
 
 
-                SendDraw(
+                QueueDraw(
                     position,
                     brush.color,
                     brush.sizeX,
@@ -425,6 +456,134 @@ public class WhiteBoard : NetworkBehaviour
         {
             brush.isDrawing = false;
         }
+
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        if (IsOwner)
+            NetworkObject.DontDestroyWithOwner = true;
+
+        if (IsOwner && NetworkManager != null)
+            NetworkManager.OnClientConnectedCallback += OnClientConnected;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        pendingDrawPoints.Clear();
+
+        if (NetworkManager != null)
+            NetworkManager.OnClientConnectedCallback -= OnClientConnected;
+
+        base.OnNetworkDespawn();
+    }
+
+    private void OnClientConnected(ulong clientId)
+    {
+        if (!IsOwner ||
+            clientId == NetworkManager.LocalClientId ||
+            drawHistory.Count == 0)
+        {
+            return;
+        }
+
+        BeginSnapshotRpc(
+            RpcTarget.Single(clientId, RpcTargetUse.Temp)
+        );
+
+        for (int i = 0; i < drawHistory.Count; i++)
+        {
+            DrawBatchRecord batch = drawHistory[i];
+
+            ReceiveSnapshotBatchRpc(
+                batch.Positions,
+                batch.Color,
+                batch.SizeX,
+                batch.SizeY,
+                batch.Rotation,
+                RpcTarget.Single(clientId, RpcTargetUse.Temp)
+            );
+        }
+    }
+
+    [Rpc(
+        SendTo.SpecifiedInParams,
+        InvokePermission = RpcInvokePermission.Owner
+    )]
+    private void BeginSnapshotRpc(RpcParams rpcParams = default)
+    {
+        drawHistory.Clear();
+        ClearRenderTexture();
+    }
+
+    [Rpc(
+        SendTo.SpecifiedInParams,
+        InvokePermission = RpcInvokePermission.Owner
+    )]
+    private void ReceiveSnapshotBatchRpc(
+        Vector2[] positions,
+        Color color,
+        float sizeX,
+        float sizeY,
+        float rotationAngle,
+        RpcParams rpcParams = default)
+    {
+        StoreHistory(
+            positions,
+            color,
+            sizeX,
+            sizeY,
+            rotationAngle
+        );
+
+        DrawBatch(
+            positions,
+            color,
+            sizeX,
+            sizeY,
+            rotationAngle
+        );
+    }
+
+    public void ClearBoard()
+    {
+        if (!IsSpawned)
+        {
+            ClearRenderTexture();
+            return;
+        }
+
+        RequestClearBoardRpc();
+    }
+
+    [Rpc(
+        SendTo.Authority,
+        InvokePermission = RpcInvokePermission.Everyone
+    )]
+    private void RequestClearBoardRpc(RpcParams rpcParams = default)
+    {
+        if (!NetworkRoleUtility.HasRole(
+                rpcParams.Receive.SenderClientId,
+                PlayerRole.Presenter))
+        {
+            return;
+        }
+
+        drawHistory.Clear();
+        BroadcastClearBoardRpc();
+    }
+
+    [Rpc(
+        SendTo.Everyone,
+        InvokePermission = RpcInvokePermission.Owner
+    )]
+    private void BroadcastClearBoardRpc()
+    {
+        drawHistory.Clear();
+        pendingDrawPoints.Clear();
+        ClearRenderTexture();
     }
 
 
@@ -432,7 +591,7 @@ public class WhiteBoard : NetworkBehaviour
     // SEND DRAW
     // =====================================================
 
-    private void SendDraw(
+    private void QueueDraw(
         Vector2 position,
         Color color,
         float sizeX,
@@ -451,28 +610,59 @@ public class WhiteBoard : NetworkBehaviour
         );
 
 
-        // اگر Network فعال نیست
-        // فقط Local Drawing انجام شود.
+        // اگر Network فعال نیست، فقط Local Drawing انجام شود.
+        if (!IsSpawned)
+            return;
+
+        bool styleChanged = pendingDrawPoints.Count > 0 &&
+            (pendingColor != color ||
+             !Mathf.Approximately(pendingSizeX, sizeX) ||
+             !Mathf.Approximately(pendingSizeY, sizeY) ||
+             !Mathf.Approximately(pendingRotation, rotationAngle));
+
+        if (styleChanged)
+            FlushPendingDrawBatch();
+
+        if (pendingDrawPoints.Count == 0)
+        {
+            pendingColor = color;
+            pendingSizeX = sizeX;
+            pendingSizeY = sizeY;
+            pendingRotation = rotationAngle;
+            nextBatchSendTime = Time.unscaledTime + batchInterval;
+        }
+
+        pendingDrawPoints.Add(position);
+
+        if (pendingDrawPoints.Count >= maxPointsPerBatch)
+            FlushPendingDrawBatch();
+    }
+
+    private void FlushPendingDrawBatch()
+    {
+        if (pendingDrawPoints.Count == 0)
+            return;
+
+        Vector2[] positions = pendingDrawPoints.ToArray();
+        pendingDrawPoints.Clear();
 
         if (!IsSpawned)
             return;
 
+        StoreHistory(
+            positions,
+            pendingColor,
+            pendingSizeX,
+            pendingSizeY,
+            pendingRotation
+        );
 
-        // اطلاعات Draw را برای Authority فعلی تخته می‌فرستیم.
-
-        RequestDrawRpc(
-            position.x,
-            position.y,
-
-            color.r,
-            color.g,
-            color.b,
-            color.a,
-
-            sizeX,
-            sizeY,
-
-            rotationAngle
+        RequestDrawBatchRpc(
+            positions,
+            pendingColor,
+            pendingSizeX,
+            pendingSizeY,
+            pendingRotation
         );
     }
 
@@ -485,43 +675,46 @@ public class WhiteBoard : NetworkBehaviour
         SendTo.Authority,
         InvokePermission = RpcInvokePermission.Everyone
     )]
-    private void RequestDrawRpc(
-        float x,
-        float y,
-
-        float r,
-        float g,
-        float b,
-        float a,
-
+    private void RequestDrawBatchRpc(
+        Vector2[] positions,
+        Color color,
         float sizeX,
         float sizeY,
-
         float rotationAngle,
-
         RpcParams rpcParams = default)
     {
-        // بعداً اینجا می‌توانیم چک کنیم
-        // Sender واقعاً Presenter هست یا نه.
+        if (!NetworkRoleUtility.HasRole(
+                rpcParams.Receive.SenderClientId,
+                PlayerRole.Presenter))
+        {
+            Debug.LogWarning(
+                "[WhiteBoard] Rejected drawing from a non-presenter."
+            );
+            return;
+        }
 
 
-        // Authority فرمان Draw را
-        // برای Clientها ارسال می‌کند.
+        if (positions == null || positions.Length == 0)
+            return;
 
-        BroadcastDrawRpc(
-            x,
-            y,
+        if (rpcParams.Receive.SenderClientId !=
+            NetworkManager.LocalClientId)
+        {
+            StoreHistory(
+                positions,
+                color,
+                sizeX,
+                sizeY,
+                rotationAngle
+            );
+        }
 
-            r,
-            g,
-            b,
-            a,
-
+        BroadcastDrawBatchRpc(
+            positions,
+            color,
             sizeX,
             sizeY,
-
             rotationAngle,
-
             rpcParams.Receive.SenderClientId
         );
     }
@@ -535,20 +728,12 @@ public class WhiteBoard : NetworkBehaviour
         SendTo.Everyone,
         InvokePermission = RpcInvokePermission.Owner
     )]
-    private void BroadcastDrawRpc(
-        float x,
-        float y,
-
-        float r,
-        float g,
-        float b,
-        float a,
-
+    private void BroadcastDrawBatchRpc(
+        Vector2[] positions,
+        Color color,
         float sizeX,
         float sizeY,
-
         float rotationAngle,
-
         ulong originalSender)
     {
         // کسی که خودش Draw را ارسال کرده
@@ -561,27 +746,67 @@ public class WhiteBoard : NetworkBehaviour
             return;
         }
 
-
-        Vector2 position =
-            new Vector2(x, y);
-
-
-        Color color =
-            new Color(
-                r,
-                g,
-                b,
-                a
+        if (!IsOwner)
+        {
+            StoreHistory(
+                positions,
+                color,
+                sizeX,
+                sizeY,
+                rotationAngle
             );
+        }
 
 
-        DrawAtPosition(
-            position,
+        DrawBatch(
+            positions,
             color,
             sizeX,
             sizeY,
             rotationAngle
         );
+    }
+
+    private void DrawBatch(
+        Vector2[] positions,
+        Color color,
+        float sizeX,
+        float sizeY,
+        float rotationAngle)
+    {
+        if (positions == null)
+            return;
+
+        for (int i = 0; i < positions.Length; i++)
+        {
+            DrawAtPosition(
+                positions[i],
+                color,
+                sizeX,
+                sizeY,
+                rotationAngle
+            );
+        }
+    }
+
+    private void StoreHistory(
+        Vector2[] positions,
+        Color color,
+        float sizeX,
+        float sizeY,
+        float rotationAngle)
+    {
+        if (positions == null || positions.Length == 0)
+            return;
+
+        drawHistory.Add(new DrawBatchRecord
+        {
+            Positions = (Vector2[])positions.Clone(),
+            Color = color,
+            SizeX = sizeX,
+            SizeY = sizeY,
+            Rotation = rotationAngle
+        });
     }
 
 
@@ -650,29 +875,25 @@ public class WhiteBoard : NetworkBehaviour
             Mathf.Sin(radians);
 
 
-        Vector2[] vertices =
-            new Vector2[4];
-
-
-        vertices[0] =
+        drawVertices[0] =
             new Vector2(
                 -sizeX,
                 -sizeY
             );
 
-        vertices[1] =
+        drawVertices[1] =
             new Vector2(
                 sizeX,
                 -sizeY
             );
 
-        vertices[2] =
+        drawVertices[2] =
             new Vector2(
                 sizeX,
                 sizeY
             );
 
-        vertices[3] =
+        drawVertices[3] =
             new Vector2(
                 -sizeX,
                 sizeY
@@ -680,17 +901,17 @@ public class WhiteBoard : NetworkBehaviour
 
 
         for (int i = 0;
-             i < vertices.Length;
+             i < drawVertices.Length;
              i++)
         {
             float rotatedX =
-                vertices[i].x * cos +
-                vertices[i].y * sin;
+                drawVertices[i].x * cos +
+                drawVertices[i].y * sin;
 
 
             float rotatedY =
-                -vertices[i].x * sin +
-                vertices[i].y * cos;
+                -drawVertices[i].x * sin +
+                drawVertices[i].y * cos;
 
 
             GL.Vertex3(
@@ -767,5 +988,13 @@ public class WhiteBoard : NetworkBehaviour
 
         RenderTexture.active =
             previous;
+    }
+
+    public override void OnDestroy()
+    {
+        if (brushMaterial != null)
+            Destroy(brushMaterial);
+
+        base.OnDestroy();
     }
 }

@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using Unity.Netcode;
 
@@ -25,13 +24,8 @@ public class HighFiveDetector : NetworkBehaviour
         
         PlayHighFiveEffectRpc(contactPos);
 
-        RequestHighFiveIncrementRpc();
-    }
-
-    [Rpc(SendTo.Server)]
-    private void RequestHighFiveIncrementRpc()
-    {
-        HighFiveCounter.Instance.IncreaseCount();
+        if (HighFiveCounter.Instance != null)
+            HighFiveCounter.Instance.RequestIncrement();
     }
 
     [Rpc(SendTo.Everyone)]

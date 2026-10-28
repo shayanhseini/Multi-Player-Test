@@ -114,5 +114,8 @@ public class PresentationDisplay : MonoBehaviour
             presentationState.currentPage.OnValueChanged -=
                 OnPageChanged;
         }
+
+        if (displayMaterial != null)
+            Destroy(displayMaterial);
     }
 }
