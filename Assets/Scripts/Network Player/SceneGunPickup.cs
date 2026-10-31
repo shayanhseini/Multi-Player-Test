@@ -31,7 +31,8 @@ public class SceneGunPickup : MonoBehaviour
             gunBody = gunRoot.gameObject.AddComponent<Rigidbody>();
         gunBody.mass = 0.4f;
         gunBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-        gunBody.isKinematic = true;
+            gunBody.isKinematic = false;
+            gunBody.useGravity = true;
 
         grabInteractable = gunRoot.GetComponent<XRGrabInteractable>();
         if (grabInteractable == null)
@@ -49,7 +50,6 @@ public class SceneGunPickup : MonoBehaviour
             return;
         networkReady = connected;
         grabInteractable.enabled = connected;
-        gunBody.isKinematic = !connected;
     }
 
     private void OnGrabbed(SelectEnterEventArgs args)
@@ -84,9 +84,22 @@ public class SceneGunPickup : MonoBehaviour
             return null;
         GameObject clone = Instantiate(gunRoot.gameObject);
         clone.name = "Remote Player Gun";
-        foreach (Collider item in clone.GetComponentsInChildren<Collider>()) Destroy(item);
-        foreach (Rigidbody item in clone.GetComponentsInChildren<Rigidbody>()) Destroy(item);
-        foreach (XRGrabInteractable item in clone.GetComponentsInChildren<XRGrabInteractable>()) Destroy(item);
+
+        // XRGrabInteractable requires a Rigidbody. Keep the dependency graph
+        // intact on visual clones, but make every physics/interaction component
+        // inert so the remote representation cannot be grabbed or collide.
+        foreach (XRGrabInteractable item in clone.GetComponentsInChildren<XRGrabInteractable>())
+            item.enabled = false;
+
+        foreach (Collider item in clone.GetComponentsInChildren<Collider>())
+            item.enabled = false;
+
+        foreach (Rigidbody item in clone.GetComponentsInChildren<Rigidbody>())
+        {
+            item.useGravity = false;
+            item.isKinematic = true;
+            item.detectCollisions = false;
+        }
         return clone;
     }
 
@@ -97,8 +110,14 @@ public class SceneGunPickup : MonoBehaviour
         GameObject clone = Instantiate(bulletTemplate, position, Quaternion.identity);
         clone.name = "Bullet (Shot)";
         clone.SetActive(true);
-        foreach (Collider item in clone.GetComponentsInChildren<Collider>()) Destroy(item);
-        foreach (Rigidbody item in clone.GetComponentsInChildren<Rigidbody>()) Destroy(item);
+        foreach (Collider item in clone.GetComponentsInChildren<Collider>())
+            item.enabled = false;
+        foreach (Rigidbody item in clone.GetComponentsInChildren<Rigidbody>())
+        {
+            item.useGravity = false;
+            item.isKinematic = true;
+            item.detectCollisions = false;
+        }
         return clone;
     }
 

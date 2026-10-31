@@ -4,433 +4,169 @@ using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
-    // =========================
-    // Roles
-    // =========================
-
-    public static PlayerRole SelectedRole { get; private set; }
-
-
-    // =========================
-    // PANELS
-    // =========================
-
-    [Header("Panels")]
-    public GameObject mainMenu;
-    public GameObject presenterPassword;
-    public GameObject presenterMenu;
-    public GameObject createSession;
-    public GameObject joinSession;
-    public GameObject sessionCreated;
-    public GameObject joinedSession;
-    public GameObject connecting;
-
-
-    // =========================
-    // MAIN MENU BUTTONS
-    // =========================
+    [Header("Connection Panels")]
+    [SerializeField] private GameObject mainMenu;
+    [SerializeField] private GameObject joinSession;
+    [SerializeField] private GameObject sessionCreated;
+    [SerializeField] private GameObject joinedSession;
+    [SerializeField] private GameObject connecting;
 
     [Header("Buttons & Input")]
-    public Button presenterButton;
-    public Button guestButton;
+    [SerializeField] private Button hostButton;
+    [SerializeField] private Button clientButton;
+    [SerializeField] private TMP_InputField sessionCodeInput;
+    [SerializeField] private Button joinButton;
+    [SerializeField] private Button joinSessionBackButton;
+    [SerializeField] private Button disconnectButton;
 
+    [Header("Connection")]
+    [SerializeField] private ConnectionManager connectionManager;
+    [SerializeField] private TextMeshProUGUI sessionCreatedCodeText;
 
-    // =========================
-    // PRESENTER PASSWORD
-    // =========================
-
-    public TMP_InputField passwordInput;
-    public Button passwordConfirmButton;
-    public Button passwordBackButton;
-
-
-    // =========================
-    // PRESENTER MENU BUTTONS
-    // =========================
-
-    public Button createSessionButton;
-    public Button joinSessionButton;
-    public Button presenterMenuBackButton;
-
-
-    // =========================
-    // CREATE SESSION
-    // =========================
-
-    public Button createButton;
-    public Button createSessionBackButton;
-
-
-    // =========================
-    // JOIN SESSION
-    // =========================
-
-    public TMP_InputField sessionCodeInput;
-    public Button joinButton;
-    public Button joinSessionBackButton;
-
-
-    // =========================
-    // JOINED SESSION
-    // =========================
-
-    public Button disconnectButton;
-
-
-    // =========================
-    // CONNECTION
-    // =========================
-
-    public ConnectionManager connectionManager;
-
-
-    // =========================
-    // LAN ADDRESS
-    // =========================
-
-    [Header("Text")]
-    public TextMeshProUGUI sessionCreatedCodeText;
-    public TextMeshProUGUI sessionJoinCodeText;
-
-
-    // =========================
-    // START
-    // =========================
-
-    private void Start()
+    private void Awake()
     {
-        // =========================
-        // Main Menu
-        // =========================
+        hostButton?.onClick.AddListener(CreateSession);
+        clientButton?.onClick.AddListener(JoinSession);
+        joinButton?.onClick.AddListener(JoinSession);
+        joinSessionBackButton?.onClick.AddListener(ShowMainMenu);
+        disconnectButton?.onClick.AddListener(Disconnect);
 
-        presenterButton.onClick.AddListener(ShowPresenterMenu);
-        guestButton.onClick.AddListener(ShowJoinSession);
-
-        // Set Role
-        presenterButton.onClick.AddListener(SetPresenterRole);
-        guestButton.onClick.AddListener(SetGuestRole);
-
-
-        // =========================
-        // Presenter Password
-        // =========================
-
-
-        // =========================
-        // Presenter Menu
-        // =========================
-
-        createSessionButton.onClick.AddListener(ShowCreateSession);
-        joinSessionButton.onClick.AddListener(ShowJoinSession);
-
-        presenterMenuBackButton.onClick.AddListener(OnPresenterMenuBack);
-
-
-        // =========================
-        // Create Session
-        // =========================
-
-        createButton.onClick.AddListener(OnCreateSession);
-
-        createSessionBackButton.onClick.AddListener(OnCreateSessionBack);
-
-
-        // =========================
-        // Join Session
-        // =========================
-
-        joinButton.onClick.AddListener(OnJoinSession);
-
-        joinSessionBackButton.onClick.AddListener(OnJoinSessionBack);
-
-
-        // =========================
-        // Joined Session
-        // =========================
-
-        disconnectButton.onClick.AddListener(OnDisconnect);
-
-
-        // =========================
-        // Connection Events
-        // =========================
-
-        connectionManager.onConnectionEvent.AddListener(OnConnectionStateChanged);
-
-        connectionManager.onSessionCreated.AddListener(ShowSessionCreated);
-
-        connectionManager.onSessionJoined.AddListener(ShowJoinedSession);
-
-        connectionManager.onSessionCodeCreated.AddListener(SetSessionCode);
-
-
-        // =========================
-        // Initial Panel
-        // =========================
+        if (connectionManager != null)
+        {
+            connectionManager.onConnectionEvent.AddListener(OnConnectionStateChanged);
+            connectionManager.onSessionCodeCreated.AddListener(SetSessionAddress);
+            connectionManager.onSessionCreated.AddListener(ShowSessionCreated);
+            connectionManager.onSessionJoined.AddListener(ShowJoinedSession);
+        }
 
         ShowMainMenu();
     }
 
+    private void OnDestroy()
+    {
+        hostButton?.onClick.RemoveListener(CreateSession);
+        clientButton?.onClick.RemoveListener(JoinSession);
+        joinButton?.onClick.RemoveListener(JoinSession);
+        joinSessionBackButton?.onClick.RemoveListener(ShowMainMenu);
+        disconnectButton?.onClick.RemoveListener(Disconnect);
 
-    // =========================================================
-    // KEYBOARD
-    // =========================================================
+        if (connectionManager == null)
+            return;
 
-    private void HideKeyboard()
+        connectionManager.onConnectionEvent.RemoveListener(OnConnectionStateChanged);
+        connectionManager.onSessionCodeCreated.RemoveListener(SetSessionAddress);
+        connectionManager.onSessionCreated.RemoveListener(ShowSessionCreated);
+        connectionManager.onSessionJoined.RemoveListener(ShowJoinedSession);
+    }
+
+    private void CreateSession()
+    {
+        HideKeyboard();
+        ShowConnecting();
+
+        if (connectionManager != null)
+            connectionManager.CreateSession();
+        else
+            ShowMainMenu();
+    }
+
+    private void JoinSession()
+    {
+        HideKeyboard();
+        ShowConnecting();
+
+        if (connectionManager != null)
+            connectionManager.JoinFirstLanHost();
+        else
+            ShowMainMenu();
+    }
+
+    private void Disconnect()
+    {
+        HideKeyboard();
+        ShowConnecting();
+
+        if (connectionManager != null)
+            connectionManager.Disconnect();
+        else
+            ShowMainMenu();
+    }
+
+    private void SetSessionAddress(string address)
+    {
+        if (sessionCreatedCodeText != null)
+            sessionCreatedCodeText.text = address;
+    }
+
+    private void OnConnectionStateChanged(ConnectionManager.ConnectionState state)
+    {
+        switch (state)
+        {
+            case ConnectionManager.ConnectionState.Connecting:
+            case ConnectionManager.ConnectionState.Reconnecting:
+            case ConnectionManager.ConnectionState.Disconnecting:
+                ShowConnecting();
+                break;
+
+            case ConnectionManager.ConnectionState.Failed:
+            case ConnectionManager.ConnectionState.Disconnected:
+                HideKeyboard();
+                ShowMainMenu();
+                break;
+        }
+    }
+
+    private static void HideKeyboard()
     {
         if (KeyboardManager.Instance == null)
             return;
 
         KeyboardManager.Instance.HideKeyboard();
-
         KeyboardManager.Instance.ClearActiveInputField();
     }
 
-
-
-    // =========================================================
-    // CREATE SESSION
-    // =========================================================
-
-    private void OnCreateSession()
+    private void HideAllPanels()
     {
-        HideKeyboard();
-
-        connectionManager.CreateSession();
+        SetActive(mainMenu, false);
+        SetActive(joinSession, false);
+        SetActive(sessionCreated, false);
+        SetActive(joinedSession, false);
+        SetActive(connecting, false);
     }
-
-
-    private void SetSessionCode(string sessionCode)
-    {
-        sessionCreatedCodeText.text = sessionCode;
-        sessionJoinCodeText.text = sessionCode;
-    }
-
-
-    // =========================================================
-    // JOIN SESSION
-    // =========================================================
-
-    private void OnJoinSession()
-    {
-        string sessionCode = sessionCodeInput.text;
-
-        if (string.IsNullOrWhiteSpace(sessionCode))
-        {
-            Debug.Log("LAN host IP address is empty.");
-            return;
-        }
-
-        HideKeyboard();
-
-        connectionManager.JoinSession(sessionCode);
-    }
-
-
-    // =========================================================
-    // JOIN SESSION BACK
-    // =========================================================
-
-    private void OnJoinSessionBack()
-    {
-        HideKeyboard();
-
-        ShowMainMenu();
-    }
-
-
-    // =========================================================
-    // PRESENTER MENU BACK
-    // =========================================================
-
-    private void OnPresenterMenuBack()
-    {
-        HideKeyboard();
-
-        ShowMainMenu();
-    }
-
-
-    // =========================================================
-    // CREATE SESSION BACK
-    // =========================================================
-
-    private void OnCreateSessionBack()
-    {
-        HideKeyboard();
-
-        ShowPresenterMenu();
-    }
-
-
-    // =========================================================
-    // DISCONNECT
-    // =========================================================
-
-    private void OnDisconnect()
-    {
-        HideKeyboard();
-
-        connectionManager.Disconnect();
-    }
-
-
-    // =========================================================
-    // CONNECTION STATE
-    // =========================================================
-
-    private void OnConnectionStateChanged(
-        ConnectionManager.ConnectionState state)
-    {
-        switch (state)
-        {
-            case ConnectionManager.ConnectionState.Connecting:
-
-            case ConnectionManager.ConnectionState.Reconnecting:
-
-                HideKeyboard();
-
-                ShowConnecting();
-
-                break;
-
-
-            case ConnectionManager.ConnectionState.Success:
-
-                break;
-
-
-            case ConnectionManager.ConnectionState.Failed:
-
-                Debug.Log("Connection Failed.");
-
-                HideKeyboard();
-
-                ShowMainMenu();
-
-                break;
-
-
-            case ConnectionManager.ConnectionState.Disconnecting:
-
-                HideKeyboard();
-
-                ShowConnecting();
-
-                break;
-
-
-            case ConnectionManager.ConnectionState.Disconnected:
-
-                HideKeyboard();
-
-                ShowMainMenu();
-
-                break;
-        }
-    }
-
-
-    // =========================================================
-    // ROLE SELECTION
-    // =========================================================
-
-    private void SetPresenterRole()
-    {
-        SelectedRole = PlayerRole.Presenter;
-    }
-
-
-    private void SetGuestRole()
-    {
-        SelectedRole = PlayerRole.Guest;
-    }
-
-
-    // =========================================================
-    // PANEL CONTROL
-    // =========================================================
-
-    public void HideAllPanels()
-    {
-        mainMenu.SetActive(false);
-
-        presenterPassword.SetActive(false);
-
-        presenterMenu.SetActive(false);
-
-        createSession.SetActive(false);
-
-        joinSession.SetActive(false);
-
-        sessionCreated.SetActive(false);
-
-        joinedSession.SetActive(false);
-
-        connecting.SetActive(false);
-    }
-
 
     public void ShowMainMenu()
     {
         HideAllPanels();
-
-        mainMenu.SetActive(true);
+        SetActive(mainMenu, true);
     }
-
-
-    public void ShowPresenterPassword()
-    {
-        HideAllPanels();
-
-        presenterPassword.SetActive(true);
-    }
-
-
-    public void ShowPresenterMenu()
-    {
-        HideAllPanels();
-
-        presenterMenu.SetActive(true);
-    }
-
-
-    public void ShowCreateSession()
-    {
-        HideAllPanels();
-
-        createSession.SetActive(true);
-    }
-
 
     public void ShowJoinSession()
     {
         HideAllPanels();
-
-        joinSession.SetActive(true);
+        SetActive(joinSession, true);
     }
-
 
     public void ShowSessionCreated()
     {
         HideAllPanels();
-
-        sessionCreated.SetActive(true);
+        SetActive(sessionCreated, true);
     }
-
 
     public void ShowJoinedSession()
     {
         HideAllPanels();
-
-        joinedSession.SetActive(true);
+        SetActive(joinedSession, true);
     }
-
 
     public void ShowConnecting()
     {
         HideAllPanels();
+        SetActive(connecting, true);
+    }
 
-        connecting.SetActive(true);
+    private static void SetActive(GameObject panel, bool value)
+    {
+        if (panel != null)
+            panel.SetActive(value);
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -19,6 +20,7 @@ public class NetworkShooter : NetworkBehaviour
     private SceneGunPickup localPickup;
     private GameObject remoteGunVisual;
     private double lastServerShotTime = double.NegativeInfinity;
+    private bool serverGunHeld;
 
     private void Awake() => player = GetComponent<VRNetworkPlayer>();
 
@@ -44,20 +46,41 @@ public class NetworkShooter : NetworkBehaviour
 
     public void BindPickup(SceneGunPickup pickup)
     {
-        if (IsOwner)
-            localPickup = pickup;
+        if (!IsOwner) return;
+        localPickup = pickup;
+        if (CanSendRpc())
+            SetGunHeldRpc(true);
     }
 
     public void UnbindPickup(SceneGunPickup pickup)
     {
-        if (IsOwner && localPickup == pickup)
-            localPickup = null;
+        if (!IsOwner || localPickup != pickup) return;
+        localPickup = null;
+        if (CanSendRpc())
+            SetGunHeldRpc(false);
     }
 
     public void TryShoot(Vector3 origin, Vector3 direction)
     {
-        if (IsOwner && localPickup != null && player != null && player.IsAlive.Value)
+        if (IsOwner &&
+            localPickup != null &&
+            player != null &&
+            player.IsAlive.Value &&
+            CanSendRpc())
             RequestShootRpc(origin, direction.normalized);
+    }
+
+    private bool CanSendRpc()
+    {
+        return IsSpawned &&
+               NetworkManager.Singleton != null &&
+               NetworkManager.Singleton.IsListening;
+    }
+
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    private void SetGunHeldRpc(bool isHeld, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId == OwnerClientId) serverGunHeld = isHeld;
     }
 
     private void UpdateRemoteGunVisual()
@@ -82,7 +105,7 @@ public class NetworkShooter : NetworkBehaviour
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
     private void RequestShootRpc(Vector3 origin, Vector3 direction, RpcParams rpcParams = default)
     {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId || player == null || !player.IsAlive.Value)
+        if (rpcParams.Receive.SenderClientId != OwnerClientId || player == null || !player.IsAlive.Value || !serverGunHeld)
             return;
 
         double now = NetworkManager.ServerTime.Time;
@@ -99,12 +122,15 @@ public class NetworkShooter : NetworkBehaviour
         lastServerShotTime = now;
         Vector3 endPoint = origin + direction * maxDistance;
 
-        if (Physics.SphereCast(origin, bulletRadius, direction, out RaycastHit hit, maxDistance, hitMask, QueryTriggerInteraction.Ignore))
+        RaycastHit[] hits = Physics.SphereCastAll(origin, bulletRadius, direction, maxDistance, hitMask, QueryTriggerInteraction.Collide);
+        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        foreach (RaycastHit hit in hits)
         {
-            endPoint = hit.point;
             VRNetworkPlayer target = hit.collider.GetComponentInParent<VRNetworkPlayer>();
-            if (target != null && target != player)
-                target.ApplyDamageServer(damage, OwnerClientId);
+            if (target == player) continue;
+            endPoint = hit.point;
+            if (target != null) target.ApplyDamageServer(damage, OwnerClientId);
+            break;
         }
 
         ShowShotRpc(origin, endPoint);
@@ -136,6 +162,8 @@ public class NetworkShooter : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
+        localPickup = null;
+        serverGunHeld = false;
         if (remoteGunVisual != null)
             Destroy(remoteGunVisual);
         base.OnNetworkDespawn();

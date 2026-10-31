@@ -3,6 +3,8 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Collections;
+using System.Text;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
@@ -11,15 +13,23 @@ using UnityEngine.Events;
 public class ConnectionManager : MonoBehaviour
 {
     [Header("LAN")]
-    [SerializeField, Min(1)] private int maxPlayers = 10;
+    [SerializeField, Min(1)] private int maxPlayers = 12;
     [SerializeField, Min(1)] private ushort port = 7777;
+    [SerializeField, Min(1)] private ushort discoveryPort = 47777;
+    [SerializeField, Min(0.5f)] private float discoveryTimeout = 3f;
     [SerializeField] private string fallbackHostAddress = "127.0.0.1";
+
+    private const string DiscoveryRequest = "LAN_SHOOTER_DISCOVER_V1";
+    private const string DiscoveryResponsePrefix = "LAN_SHOOTER_HOST_V1|";
 
     private NetworkManager networkManager;
     private UnityTransport transport;
     private bool connectionOperationInProgress;
     private bool intentionalDisconnect;
     private string localAddress = string.Empty;
+    private UdpClient hostDiscoverySocket;
+    private Coroutine hostDiscoveryRoutine;
+    private Coroutine clientDiscoveryRoutine;
 
     public enum ConnectionState
     {
@@ -61,7 +71,11 @@ public class ConnectionManager : MonoBehaviour
 
     private void OnEnable() => RegisterNetworkCallbacks();
 
-    private void OnDisable() => UnregisterNetworkCallbacks();
+    private void OnDisable()
+    {
+        UnregisterNetworkCallbacks();
+        StopLanDiscovery();
+    }
 
     public void CreateSession()
     {
@@ -76,19 +90,25 @@ public class ConnectionManager : MonoBehaviour
         networkManager.NetworkConfig.ConnectionApproval = true;
         networkManager.ConnectionApprovalCallback = ApproveLanClient;
 
-        string bindAddress = IsPrivateOrLoopbackIPv4(localAddress)
+        string advertisedAddress = IsPrivateOrLoopbackIPv4(localAddress)
             ? localAddress
             : IPAddress.Loopback.ToString();
 
-        transport.SetConnectionData(bindAddress, port, bindAddress);
+        // Listen on every local adapter. This supports both real LAN clients and
+        // multiple Editor/clone instances connecting through loopback.
+        transport.SetConnectionData(
+            advertisedAddress,
+            port,
+            IPAddress.Any.ToString());
 
         if (!networkManager.StartHost())
         {
-            FailConnection($"Could not start LAN host on {bindAddress}:{port}.");
+            FailConnection($"Could not start LAN host on port {port}.");
             return;
         }
 
-        localAddress = bindAddress;
+        localAddress = advertisedAddress;
+        StartHostDiscovery();
         connectionOperationInProgress = false;
         onSessionCodeCreated?.Invoke($"{localAddress}:{port}");
         onConnectionEvent?.Invoke(ConnectionState.Success);
@@ -114,12 +134,32 @@ public class ConnectionManager : MonoBehaviour
         onConnectionEvent?.Invoke(ConnectionState.Connecting);
 
         ConfigureClientServerTopology();
-        networkManager.NetworkConfig.ConnectionApproval = false;
+        // This flag is part of the Netcode connection message format and must
+        // match the host. Only the host needs an approval callback.
+        networkManager.NetworkConfig.ConnectionApproval = true;
         networkManager.ConnectionApprovalCallback = null;
-        transport.SetConnectionData(address, targetPort);
+        string connectionAddress = IsAddressAssignedToThisMachine(address)
+            ? IPAddress.Loopback.ToString()
+            : address;
+
+        transport.SetConnectionData(connectionAddress, targetPort);
+        Debug.Log(
+            $"Connecting to LAN host {address}:{targetPort} " +
+            $"through {connectionAddress}:{targetPort}");
 
         if (!networkManager.StartClient())
             FailConnection($"Could not start LAN client for {address}:{targetPort}.");
+    }
+
+    public void JoinFirstLanHost()
+    {
+        if (!CanStartConnection())
+            return;
+
+        connectionOperationInProgress = true;
+        intentionalDisconnect = false;
+        onConnectionEvent?.Invoke(ConnectionState.Connecting);
+        clientDiscoveryRoutine = StartCoroutine(DiscoverFirstHost());
     }
 
     public void Disconnect()
@@ -132,6 +172,7 @@ public class ConnectionManager : MonoBehaviour
 
         intentionalDisconnect = true;
         connectionOperationInProgress = true;
+        StopLanDiscovery();
         onConnectionEvent?.Invoke(ConnectionState.Disconnecting);
         networkManager.Shutdown();
     }
@@ -159,6 +200,136 @@ public class ConnectionManager : MonoBehaviour
     private void ConfigureClientServerTopology()
     {
         networkManager.NetworkConfig.NetworkTopology = NetworkTopologyTypes.ClientServer;
+    }
+
+    private void StartHostDiscovery()
+    {
+        StopHostDiscovery();
+
+        try
+        {
+            hostDiscoverySocket = new UdpClient(AddressFamily.InterNetwork);
+            hostDiscoverySocket.Client.SetSocketOption(
+                SocketOptionLevel.Socket,
+                SocketOptionName.ReuseAddress,
+                true);
+            hostDiscoverySocket.Client.Bind(
+                new IPEndPoint(IPAddress.Any, discoveryPort));
+            hostDiscoveryRoutine = StartCoroutine(AnswerDiscoveryRequests());
+            Debug.Log($"LAN discovery started on UDP port {discoveryPort}.");
+        }
+        catch (Exception exception)
+        {
+            StopHostDiscovery();
+            Debug.LogWarning($"Could not start LAN discovery: {exception.Message}");
+        }
+    }
+
+    private IEnumerator AnswerDiscoveryRequests()
+    {
+        byte[] response = Encoding.UTF8.GetBytes(
+            $"{DiscoveryResponsePrefix}{port}");
+
+        while (hostDiscoverySocket != null &&
+               networkManager != null &&
+               networkManager.IsHost)
+        {
+            while (hostDiscoverySocket.Available > 0)
+            {
+                IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+                byte[] request = hostDiscoverySocket.Receive(ref sender);
+                string message = Encoding.UTF8.GetString(request);
+
+                if (message == DiscoveryRequest)
+                    hostDiscoverySocket.Send(response, response.Length, sender);
+            }
+
+            yield return null;
+        }
+
+        hostDiscoveryRoutine = null;
+        hostDiscoverySocket?.Close();
+        hostDiscoverySocket = null;
+    }
+
+    private IEnumerator DiscoverFirstHost()
+    {
+        UdpClient discoverySocket = null;
+
+        try
+        {
+            discoverySocket = new UdpClient(AddressFamily.InterNetwork);
+            discoverySocket.EnableBroadcast = true;
+            discoverySocket.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
+
+            byte[] request = Encoding.UTF8.GetBytes(DiscoveryRequest);
+            discoverySocket.Send(
+                request,
+                request.Length,
+                new IPEndPoint(IPAddress.Broadcast, discoveryPort));
+        }
+        catch (Exception exception)
+        {
+            discoverySocket?.Close();
+            clientDiscoveryRoutine = null;
+            FailConnection($"Could not search the LAN: {exception.Message}");
+            yield break;
+        }
+
+        float deadline = Time.realtimeSinceStartup + discoveryTimeout;
+        while (Time.realtimeSinceStartup < deadline)
+        {
+            if (discoverySocket.Available > 0)
+            {
+                IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+                byte[] response = discoverySocket.Receive(ref sender);
+                string message = Encoding.UTF8.GetString(response);
+
+                if (message.StartsWith(DiscoveryResponsePrefix, StringComparison.Ordinal) &&
+                    ushort.TryParse(
+                        message[DiscoveryResponsePrefix.Length..],
+                        out ushort discoveredPort) &&
+                    discoveredPort > 0)
+                {
+                    string endpoint = $"{sender.Address}:{discoveredPort}";
+                    discoverySocket.Close();
+                    clientDiscoveryRoutine = null;
+                    connectionOperationInProgress = false;
+                    Debug.Log($"Discovered LAN host at {endpoint}.");
+                    JoinSession(endpoint);
+                    yield break;
+                }
+            }
+
+            yield return null;
+        }
+
+        discoverySocket.Close();
+        clientDiscoveryRoutine = null;
+        FailConnection("No LAN host was found. Make sure the host is running on the same network.");
+    }
+
+    private void StopLanDiscovery()
+    {
+        if (clientDiscoveryRoutine != null)
+        {
+            StopCoroutine(clientDiscoveryRoutine);
+            clientDiscoveryRoutine = null;
+        }
+
+        StopHostDiscovery();
+    }
+
+    private void StopHostDiscovery()
+    {
+        if (hostDiscoveryRoutine != null)
+        {
+            StopCoroutine(hostDiscoveryRoutine);
+            hostDiscoveryRoutine = null;
+        }
+
+        hostDiscoverySocket?.Close();
+        hostDiscoverySocket = null;
     }
 
     private void ApproveLanClient(
@@ -340,5 +511,30 @@ public class ConnectionManager : MonoBehaviour
         return bytes[0] == 10 ||
                (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) ||
                (bytes[0] == 192 && bytes[1] == 168);
+    }
+
+    private static bool IsAddressAssignedToThisMachine(string address)
+    {
+        if (IPAddress.IsLoopback(IPAddress.Parse(address)))
+            return true;
+
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces()
+                .SelectMany(adapter => adapter.GetIPProperties().UnicastAddresses)
+                .Any(unicast =>
+                    unicast.Address.AddressFamily == AddressFamily.InterNetwork &&
+                    string.Equals(
+                        unicast.Address.ToString(),
+                        address,
+                        StringComparison.Ordinal));
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning(
+                $"Could not compare the host address with local adapters: " +
+                exception.Message);
+            return false;
+        }
     }
 }
