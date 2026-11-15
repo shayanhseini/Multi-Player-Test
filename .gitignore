@@ -19,6 +19,7 @@
 /[Oo]bj/
 /[Bb]uild/
 /[Bb]uilds/
+/Build_*/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 *.log
@@ -112,3 +113,13 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Local Unity recovery scenes and generated project tooling state
+/Assets/_Recovery/
+/Assets/Plugins/ParrelSync/
+/Assets/Plugins.meta
+/Assets/Resources.meta
+/graphify-out/.graphify_learning.json
+/graphify-out/.vocab.txt
+/graphify-out/memory/
+/graphify-out/reflections/
