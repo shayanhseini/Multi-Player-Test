@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
@@ -17,10 +18,13 @@ public class ConnectionManager : MonoBehaviour
     [SerializeField, Min(1)] private ushort port = 7777;
     [SerializeField, Min(1)] private ushort discoveryPort = 47777;
     [SerializeField, Min(0.5f)] private float discoveryTimeout = 3f;
+    [SerializeField, Min(1)] private int hostPortSearchCount = 20;
+    [SerializeField] private string sessionName = "LAN COMBAT ROOM";
     [SerializeField] private string fallbackHostAddress = "127.0.0.1";
 
     private const string DiscoveryRequest = "LAN_SHOOTER_DISCOVER_V1";
     private const string DiscoveryResponsePrefix = "LAN_SHOOTER_HOST_V1|";
+    private const float DiscoveryBroadcastInterval = 0.5f;
 
     private NetworkManager networkManager;
     private UnityTransport transport;
@@ -47,6 +51,27 @@ public class ConnectionManager : MonoBehaviour
     public UnityEvent<int, int> onReconnectAttempt;
     public UnityEvent onSessionCreated;
     public UnityEvent onSessionJoined;
+    public event Action<IReadOnlyList<LanSessionInfo>> SessionsDiscovered;
+
+    public readonly struct LanSessionInfo
+    {
+        public readonly string Name;
+        public readonly string Address;
+        public readonly ushort Port;
+        public readonly int Players;
+        public readonly int Capacity;
+        public string Endpoint => $"{Address}:{Port}";
+
+        public LanSessionInfo(string name, string address, ushort port,
+            int players, int capacity)
+        {
+            Name = name;
+            Address = address;
+            Port = port;
+            Players = players;
+            Capacity = capacity;
+        }
+    }
 
     public string GetSessionID()
     {
@@ -93,6 +118,14 @@ public class ConnectionManager : MonoBehaviour
         string advertisedAddress = IsPrivateOrLoopbackIPv4(localAddress)
             ? localAddress
             : IPAddress.Loopback.ToString();
+
+        ushort availablePort = FindAvailableHostPort(port, hostPortSearchCount);
+        if (availablePort == 0)
+        {
+            FailConnection($"No free LAN game port was found from {port} to {port + hostPortSearchCount - 1}.");
+            return;
+        }
+        port = availablePort;
 
         // Listen on every local adapter. This supports both real LAN clients and
         // multiple Editor/clone instances connecting through loopback.
@@ -159,7 +192,15 @@ public class ConnectionManager : MonoBehaviour
         connectionOperationInProgress = true;
         intentionalDisconnect = false;
         onConnectionEvent?.Invoke(ConnectionState.Connecting);
-        clientDiscoveryRoutine = StartCoroutine(DiscoverFirstHost());
+        clientDiscoveryRoutine = StartCoroutine(DiscoverSessions(true));
+    }
+
+    public void DiscoverLanSessions()
+    {
+        if (!CanStartConnection()) return;
+        connectionOperationInProgress = true;
+        intentionalDisconnect = false;
+        clientDiscoveryRoutine = StartCoroutine(DiscoverSessions(false));
     }
 
     public void Disconnect()
@@ -209,6 +250,7 @@ public class ConnectionManager : MonoBehaviour
         try
         {
             hostDiscoverySocket = new UdpClient(AddressFamily.InterNetwork);
+            hostDiscoverySocket.Client.ExclusiveAddressUse = false;
             hostDiscoverySocket.Client.SetSocketOption(
                 SocketOptionLevel.Socket,
                 SocketOptionName.ReuseAddress,
@@ -227,9 +269,6 @@ public class ConnectionManager : MonoBehaviour
 
     private IEnumerator AnswerDiscoveryRequests()
     {
-        byte[] response = Encoding.UTF8.GetBytes(
-            $"{DiscoveryResponsePrefix}{port}");
-
         while (hostDiscoverySocket != null &&
                networkManager != null &&
                networkManager.IsHost)
@@ -241,7 +280,15 @@ public class ConnectionManager : MonoBehaviour
                 string message = Encoding.UTF8.GetString(request);
 
                 if (message == DiscoveryRequest)
+                {
+                    int players = networkManager.ConnectedClientsIds.Count;
+                    string cleanName = string.IsNullOrWhiteSpace(sessionName)
+                        ? "LAN COMBAT ROOM"
+                        : sessionName.Trim().Replace('|', '-');
+                    byte[] response = Encoding.UTF8.GetBytes(
+                        $"{DiscoveryResponsePrefix}{port}|{cleanName}|{players}|{maxPlayers}");
                     hostDiscoverySocket.Send(response, response.Length, sender);
+                }
             }
 
             yield return null;
@@ -252,9 +299,13 @@ public class ConnectionManager : MonoBehaviour
         hostDiscoverySocket = null;
     }
 
-    private IEnumerator DiscoverFirstHost()
+    private IEnumerator DiscoverSessions(bool autoJoinFirst)
     {
         UdpClient discoverySocket = null;
+        byte[] request = Encoding.UTF8.GetBytes(DiscoveryRequest);
+        IPEndPoint broadcastEndpoint = new IPEndPoint(
+            IPAddress.Broadcast,
+            discoveryPort);
 
         try
         {
@@ -262,11 +313,10 @@ public class ConnectionManager : MonoBehaviour
             discoverySocket.EnableBroadcast = true;
             discoverySocket.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
 
-            byte[] request = Encoding.UTF8.GetBytes(DiscoveryRequest);
             discoverySocket.Send(
                 request,
                 request.Length,
-                new IPEndPoint(IPAddress.Broadcast, discoveryPort));
+                broadcastEndpoint);
         }
         catch (Exception exception)
         {
@@ -277,27 +327,48 @@ public class ConnectionManager : MonoBehaviour
         }
 
         float deadline = Time.realtimeSinceStartup + discoveryTimeout;
+        Dictionary<string, LanSessionInfo> sessions = new();
+        float nextBroadcastTime =
+            Time.realtimeSinceStartup + DiscoveryBroadcastInterval;
         while (Time.realtimeSinceStartup < deadline)
         {
+            if (Time.realtimeSinceStartup >= nextBroadcastTime)
+            {
+                try
+                {
+                    discoverySocket.Send(
+                        request,
+                        request.Length,
+                        broadcastEndpoint);
+                }
+                catch (SocketException exception)
+                {
+                    Debug.LogWarning(
+                        $"LAN discovery retry failed: {exception.Message}");
+                }
+
+                nextBroadcastTime =
+                    Time.realtimeSinceStartup + DiscoveryBroadcastInterval;
+            }
+
             if (discoverySocket.Available > 0)
             {
                 IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
                 byte[] response = discoverySocket.Receive(ref sender);
                 string message = Encoding.UTF8.GetString(response);
 
-                if (message.StartsWith(DiscoveryResponsePrefix, StringComparison.Ordinal) &&
-                    ushort.TryParse(
-                        message[DiscoveryResponsePrefix.Length..],
-                        out ushort discoveredPort) &&
-                    discoveredPort > 0)
+                if (TryParseDiscoveryResponse(
+                        message, sender.Address.ToString(), out LanSessionInfo discovered))
                 {
-                    string endpoint = $"{sender.Address}:{discoveredPort}";
-                    discoverySocket.Close();
-                    clientDiscoveryRoutine = null;
-                    connectionOperationInProgress = false;
-                    Debug.Log($"Discovered LAN host at {endpoint}.");
-                    JoinSession(endpoint);
-                    yield break;
+                    sessions[discovered.Endpoint] = discovered;
+                    if (autoJoinFirst)
+                    {
+                        discoverySocket.Close();
+                        clientDiscoveryRoutine = null;
+                        connectionOperationInProgress = false;
+                        JoinSession(discovered.Endpoint);
+                        yield break;
+                    }
                 }
             }
 
@@ -306,7 +377,52 @@ public class ConnectionManager : MonoBehaviour
 
         discoverySocket.Close();
         clientDiscoveryRoutine = null;
-        FailConnection("No LAN host was found. Make sure the host is running on the same network.");
+        connectionOperationInProgress = false;
+        List<LanSessionInfo> result = sessions.Values
+            .OrderBy(item => item.Name)
+            .ThenBy(item => item.Endpoint)
+            .ToList();
+        SessionsDiscovered?.Invoke(result);
+        if (result.Count == 0)
+            Debug.Log("No LAN sessions were discovered during this scan.");
+    }
+
+    private bool TryParseDiscoveryResponse(
+        string message, string address, out LanSessionInfo info)
+    {
+        info = default;
+        if (!message.StartsWith(DiscoveryResponsePrefix, StringComparison.Ordinal))
+            return false;
+        string[] parts = message[DiscoveryResponsePrefix.Length..].Split('|');
+        if (parts.Length < 4 || !ushort.TryParse(parts[0], out ushort foundPort) ||
+            foundPort == 0 || !int.TryParse(parts[2], out int players) ||
+            !int.TryParse(parts[3], out int capacity))
+            return false;
+        info = new LanSessionInfo(parts[1], address, foundPort,
+            Mathf.Max(0, players), Mathf.Max(1, capacity));
+        return true;
+    }
+
+    private static ushort FindAvailableHostPort(ushort firstPort, int attempts)
+    {
+        for (int i = 0; i < Mathf.Max(1, attempts); i++)
+        {
+            int candidateValue = firstPort + i;
+            if (candidateValue > ushort.MaxValue) break;
+            ushort candidate = (ushort)candidateValue;
+            try
+            {
+                using UdpClient probe = new(AddressFamily.InterNetwork);
+                probe.Client.ExclusiveAddressUse = true;
+                probe.Client.Bind(new IPEndPoint(IPAddress.Any, candidate));
+                return candidate;
+            }
+            catch (SocketException)
+            {
+                // Try the next game port in the configured range.
+            }
+        }
+        return 0;
     }
 
     private void StopLanDiscovery()
@@ -336,7 +452,10 @@ public class ConnectionManager : MonoBehaviour
         NetworkManager.ConnectionApprovalRequest request,
         NetworkManager.ConnectionApprovalResponse response)
     {
-        bool hasRoom = networkManager.ConnectedClientsIds.Count < Mathf.Max(1, maxPlayers);
+        // maxPlayers is the combat roster (6 + 6). Keep one additional LAN
+        // connection available for the host VR observer.
+        bool hasRoom = networkManager.ConnectedClientsIds.Count <
+                       Mathf.Max(1, maxPlayers + 1);
         response.Approved = hasRoom;
         response.CreatePlayerObject = hasRoom;
         response.Pending = false;

@@ -12,7 +12,7 @@ public class SceneGunPickup : MonoBehaviour
     private XRGrabInteractable grabInteractable;
     private Rigidbody gunBody;
     private NetworkShooter localShooter;
-    private bool networkReady;
+    private bool interactionReady;
 
     public static SceneGunPickup Instance { get; private set; }
     public bool IsHeld => grabInteractable != null && grabInteractable.isSelected;
@@ -45,15 +45,23 @@ public class SceneGunPickup : MonoBehaviour
 
     private void Update()
     {
-        bool connected = NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient;
-        if (connected == networkReady || grabInteractable == null)
+        bool canUseGun = NetworkManager.Singleton != null &&
+                         NetworkManager.Singleton.IsConnectedClient &&
+                         IsLocalCombatReady();
+        if (canUseGun == interactionReady || grabInteractable == null)
             return;
-        networkReady = connected;
-        grabInteractable.enabled = connected;
+        interactionReady = canUseGun;
+        if (!canUseGun && grabInteractable.isSelected &&
+            grabInteractable.interactionManager != null)
+            grabInteractable.interactionManager.CancelInteractableSelection(
+                (IXRSelectInteractable)grabInteractable);
+        grabInteractable.enabled = canUseGun;
     }
 
     private void OnGrabbed(SelectEnterEventArgs args)
     {
+        if (!IsLocalCombatReady())
+            return;
         localShooter = FindLocalShooter();
         localShooter?.BindPickup(this);
     }
@@ -76,6 +84,19 @@ public class SceneGunPickup : MonoBehaviour
             if (shooter.IsOwner)
                 return shooter;
         return null;
+    }
+
+    private static bool IsLocalCombatReady()
+    {
+        foreach (VRNetworkPlayer player in
+                 FindObjectsByType<VRNetworkPlayer>(FindObjectsSortMode.None))
+            if (player.IsOwner)
+                return player.IsAlive.Value &&
+                       LanMatchController.Instance != null &&
+                       LanMatchController.Instance.Phase.Value == MatchPhase.Playing &&
+                       (player.Team.Value == GameTeam.Attackers ||
+                        player.Team.Value == GameTeam.Defenders);
+        return false;
     }
 
     public GameObject CreateVisualClone()

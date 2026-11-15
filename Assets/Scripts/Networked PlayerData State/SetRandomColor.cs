@@ -8,12 +8,6 @@ public class SetRandomColor : MonoBehaviour
     
     public static UnityEvent<Color> OnLocalColorChanged =  new UnityEvent<Color>();
     
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        SetRandom();
-    }
-
     public void SetRandom()
     {
         randomColor = Random.ColorHSV();

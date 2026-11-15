@@ -11,7 +11,6 @@ public class NetworkSetRandomColor : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        SetRandom();
     }
 
     public override void OnNetworkDespawn()
