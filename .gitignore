@@ -117,6 +117,7 @@ InitTestScene*.unity*
 # Local Unity recovery scenes and generated project tooling state
 /Assets/_Recovery/
 /Assets/Plugins/ParrelSync/
+/Assets/Plugins/ParrelSync.meta
 /Assets/Plugins.meta
 /Assets/Resources.meta
 /graphify-out/.graphify_learning.json
